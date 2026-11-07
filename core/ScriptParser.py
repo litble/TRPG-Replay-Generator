@@ -19,6 +19,53 @@ from .ProjConfig import Config
 from .Motion import MotionMethod
 from .Utils import concat_xy
 
+# 行内切换效果可以指定作用对象：<am:cross=10> / <bb:replace> / <ab:cross=10>
+# 别名是为了让 <animation:...> <bubble:...> <both:...> 这种直觉写法也能用
+METHOD_TARGET_ALIAS = {
+    'am':'am', 'animation':'am',
+    'bb':'bb', 'bubble':'bb',
+    'ab':'ab', 'both':'ab',
+}
+
+# 对话行解析失败时，猜一猜最常见的写法问题（只在报错时调用，不影响正常解析）
+FULLWIDTH_TO_HALFWIDTH = {
+    '：':':', '＜':'<', '＞':'>', '（':'(', '）':')', '，':',', '；':';', '［':'[', '］':']',
+}
+
+def dialogue_error_hint(text:str)->str:
+    # 1) 角色框
+    box_match = re.match(r'^\[([^\]]*)\]', text)
+    if box_match is None:
+        return '角色框没有闭合，缺少半角“]”。'
+    illegal = sorted({ch for ch in box_match.group(1) if (ch != ' ') and (re.match(r'[\w\.\;\(\)\,]', ch) is None)})
+    if illegal:
+        fullwidth = [ch for ch in illegal if ch in FULLWIDTH_TO_HALFWIDTH]
+        if fullwidth != []:
+            return '角色框“{}”里有全角符号{}，要换成半角：{}。'.format(
+                box_match.group(1),
+                ''.join('“%s”' % ch for ch in fullwidth),
+                '，'.join('%s → %s' % (ch, FULLWIDTH_TO_HALFWIDTH[ch]) for ch in fullwidth))
+        return '角色框“{}”里有非法字符“{}”，角色框只允许：名字、空格、. ; ( ) ,'.format(
+            box_match.group(1), ' '.join(illegal))
+    # 2) 全角符号（只看角色框右边、效果标签内部、效果标签右边，避免误报正文里的中文标点）
+    rest = text[box_match.end():]
+    tag_match = re.match(r'^<[^>]*>', rest)
+    tag = '' if tag_match is None else tag_match.group(0)
+    after_tag = '' if tag_match is None else rest[tag_match.end():]
+    for part, where in [(rest[:1], '角色框右边'), (tag, '效果标签里'), (after_tag[:1], '效果标签右边')]:
+        for ch in part:
+            if ch in FULLWIDTH_TO_HALFWIDTH:
+                return '{}出现了全角符号“{}”，要换成半角“{}”。'.format(where, ch, FULLWIDTH_TO_HALFWIDTH[ch])
+    # 3) 结构
+    if (tag_match is None) and (not rest.startswith(':')):
+        return '角色框右边应当是“<效果>”或者“:”，现在接的是“{}”。'.format(rest[:12])
+    if (tag_match is not None) and (after_tag[:1] != ':'):
+        return '效果标签“{}”右边应当紧跟半角“:”，现在接的是“{}”。'.format(tag, after_tag[:12])
+    # 4) 缺正文
+    if (rest.strip() == ':') or (rest.strip() == tag + ':'):
+        return '“:”后面没有发言文本，对话行至少要有一个字符的正文。'
+    return ''
+
 # 输入文件，基类
 class Script:
     # 类型名对应的Class
@@ -782,13 +829,26 @@ class RplGenLog(Script):
                 this_charactor['alpha'] = int(alpha[1:-1]) # 去掉首尾括号
             this_charactor_set[str(k)] = this_charactor
         return this_charactor_set
-    def method_parser(self,method:str)->dict: # <method=0>
+    def method_parser(self,method:str)->dict: # <method=0> / <target:method=0>
         this_section = {}
         if method == '':
             this_section['method'] = 'default'
             this_section['method_dur'] = 'default'
         else:
-            this_section['method'],method_dur =RE_modify.findall(method)[0]
+            # 作用对象前缀：<am:cross=10> 只作用于立绘，<bb:...> 只作用于气泡，<ab:...> 两者都作用
+            method_name,method_dur = None,None
+            prefix_match = RE_method_target.findall(method)
+            if prefix_match:
+                target_prefix,this_method,this_dur = prefix_match[0]
+                target = METHOD_TARGET_ALIAS.get(target_prefix[:-1].lower())
+                if target is not None:
+                    this_section['target'] = target
+                    method_name,method_dur = this_method,this_dur
+            # 没有（合法的）作用对象前缀：按原来的方式解析
+            if method_name is None:
+                this_section['method'],method_dur =RE_modify.findall(method)[0]
+            else:
+                this_section['method'] = method_name
             if method_dur == '':
                 this_section['method_dur'] = 'default'
             else:
@@ -891,7 +951,12 @@ class RplGenLog(Script):
                     try:
                         cr,cre,ts,tse,se = RE_dialogue.findall(text)[0]
                     except IndexError:
-                        raise ParserError('UnableDial')
+                        # 以前这个错误只有一句“语法错误”，既没有行号也没有原文，无法定位
+                        print('[对话行解析失败] 第{}行：{!r}'.format(i+1, text))
+                        hint = dialogue_error_hint(text)
+                        if hint != '':
+                            print('[可能的原因] ' + hint)
+                        raise ParserError('UnableDial', str(i+1))
                     # [角色框]
                     this_section['charactor_set'] = self.charactor_parser(cr=cr,i=1)
                     # <效果>
@@ -1118,10 +1183,13 @@ class RplGenLog(Script):
         if method_obj['method'] == 'default':
             return ''
         else:
+            # 作用对象前缀（只有行内效果才有）
+            target = method_obj.get('target',None)
+            prefix = '' if target is None else (target + ':')
             if method_obj['method_dur'] == 'default':
-                return '<'+ method_obj['method'] +'>'
+                return '<'+ prefix + method_obj['method'] +'>'
             else:
-                return '<'+ method_obj['method'] + '=' + str(method_obj['method_dur']) +'>'
+                return '<'+ prefix + method_obj['method'] + '=' + str(method_obj['method_dur']) +'>'
     def sound_export(self,sound_obj_set:dict)->str:
         sound_script_list = []
         for key in sound_obj_set.keys():
@@ -1650,18 +1718,30 @@ class RplGenLog(Script):
                         this_am_method:dict = self.dynamic['am_method_default'].copy()
                         this_bb_method:dict = self.dynamic['bb_method_default'].copy()
                     # 本小节的切换效果：am_method，bb_method
-                    if this_section['ab_method']['method'] == 'default' or self.dynamic['inline_method_apply'] == 'none':
-                        # 未指定
+                    inline_method:dict = this_section['ab_method']
+                    inline_target:str = inline_method.get('target',None)
+                    if inline_method['method'] == 'default' or self.dynamic['inline_method_apply'] == 'none':
+                        # 未指定（或者全局禁用了行内效果）
                         am_method:dict = this_am_method
                         bb_method:dict = this_bb_method
+                    elif inline_target is not None:
+                        # 行内写了作用对象（<am:...>/<bb:...>/<ab:...>）：优先级高于全局的 inline_method_apply
+                        if inline_target in ['am','ab']:
+                            am_method:dict = inline_method.copy()
+                        else:
+                            am_method:dict = this_am_method
+                        if inline_target in ['bb','ab']:
+                            bb_method:dict = inline_method.copy()
+                        else:
+                            bb_method:dict = this_bb_method
                     else:
-                        # 有指定
+                        # 有指定，但没写作用对象：按 inline_method_apply 决定
                         if self.dynamic['inline_method_apply'] in ['animation','both']:
-                            am_method:dict = this_section['ab_method'].copy()
+                            am_method:dict = inline_method.copy()
                         else:
                             am_method:dict = this_am_method
                         if self.dynamic['inline_method_apply'] in ['bubble','both']:
-                            bb_method:dict = this_section['ab_method'].copy()
+                            bb_method:dict = inline_method.copy()
                         else:
                             bb_method:dict = this_bb_method
                     # 是否缺省时长

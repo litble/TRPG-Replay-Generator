@@ -130,6 +130,11 @@ class RGLSnippets(CodeSnippet, Localize):
                 "leap"      : ["上进上出","<black_leap_down_minor=>",23],
                 "shake"     : ["震动*"   , "<shake_in_minor=45>",19],
             },
+            "ab_target":{
+                "ab"        : ["两者（默认）","ab:",3],
+                "am"        : ["仅立绘","am:",3],
+                "bb"        : ["仅气泡","bb:",3],
+            },
             "rich":{
                 "bold"          : ["加粗","b",2],
                 "italic"        : ["斜体","i",2],
@@ -263,6 +268,11 @@ class RGLSnippets(CodeSnippet, Localize):
                 "pass"      : ["<pass=_>","<black_pass_left_minor=>",23],
                 "leap"      : ["<leap=_>","<black_leap_down_minor=>",23],
                 "shake"     : ["<shake=_>","<shake_in_minor=45>",19],
+            },
+            "ab_target":{
+                "ab"        : ["both (default)","ab:",3],
+                "am"        : ["animation only","am:",3],
+                "bb"        : ["bubble only","bb:",3],
             },
             "rich":{
                 "bold"          : ["bold","b",2],
@@ -439,13 +449,13 @@ class RGLSnippets(CodeSnippet, Localize):
             # 如果上游
             else:
                 self.init_snippets_options('audio|tx_met')
-        elif re.fullmatch('^\[[\w\ \.\,\(\)]+\](<\w+(=\d+)>)?:[^\\"]+',text_upstream) and re.fullmatch('\{.+\}',text_downstream):
+        elif re.fullmatch('^\[[\w\ \.\,\(\)]+\](<(\w+:)?\w+(=\d+)?>)?:[^\\"]+',text_upstream) and re.fullmatch('\{.+\}',text_downstream):
             self.init_snippets_options('tx_met')
-        elif re.fullmatch('^\[[\w\ \.\,\(\)]+\](<\w+(=\d+)>)?:[^\\"]+\{\w+;',text_upstream) and text_downstream[0]=='}':
+        elif re.fullmatch('^\[[\w\ \.\,\(\)]+\](<(\w+:)?\w+(=\d+)?>)?:[^\\"]+\{\w+;',text_upstream) and text_downstream[0]=='}':
             self.init_snippets_options('am_dur') # TODO，稍微优化一下这个补全
         # 文字效果
         # 富文本
-        elif re.fullmatch('^\[[\w\ \.\,\(\)]+\](<\w+(=\d+)?>)?:[^\\"]*\[',text_upstream) and text_downstream.startswith(']'):
+        elif re.fullmatch('^\[[\w\ \.\,\(\)]+\](<(\w+:)?\w+(=\d+)?>)?:[^\\"]*\[',text_upstream) and text_downstream.startswith(']'):
             self.init_snippets_options('rich')
         elif (text_upstream.endswith("[fg:") or text_upstream.endswith("[bg:")) and text_downstream.startswith("]"):
             self.init_snippets_options('color')
@@ -495,7 +505,10 @@ class RGLSnippets(CodeSnippet, Localize):
         # 效果
         elif text_upstream == '<background>' and text_downstream[0]==':':
             self.init_snippets_options('bg_met')
-        elif (text_upstream in ['<animation>','<bubble>'] or re.fullmatch('^\[[\w\ \.\,\(\)]+\]',text_upstream)) and text_downstream[0]==':' and text_downstream[1:]!='NA':
+        elif re.fullmatch('^\[[\w\ \.\,\(\)]+\]<$',text_upstream) and text_downstream[0]==':':
+            # 刚输入 [角色]< ，补全作用对象
+            self.init_snippets_options('ab_target')
+        elif (text_upstream in ['<animation>','<bubble>'] or re.fullmatch('^\[[\w\ \.\,\(\)]+\](<\w+:)?',text_upstream)) and text_downstream[0]==':' and text_downstream[1:]!='NA':
             self.init_snippets_options('ab_met')
         elif re.fullmatch("(.+)<(\w+)=",text_upstream) and text_downstream[0]=='>':
             method = re.fullmatch("(.+)<(\w+)=",text_upstream).group(2)
@@ -515,7 +528,7 @@ class RGLSnippets(CodeSnippet, Localize):
     def init_snippets_options(self,type_='command',**kw_args):
         self.snippets_type = type_
         # 行命令
-        if self.snippets_type in ['command','set','am_dur','tx_dur','formula','inline','protocol','speed','bg_met','ab_met','tx_met']:
+        if self.snippets_type in ['command','set','am_dur','tx_dur','formula','inline','protocol','speed','bg_met','ab_met','ab_target','tx_met']:
             self.snippets_content = self.Snippets[self.localize][self.snippets_type]
             self.bulid_menu_from_dict(menu=self,dictionary=self.snippets_content)
             # 立绘切换效果的特殊之处

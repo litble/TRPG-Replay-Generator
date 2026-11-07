@@ -52,8 +52,8 @@ class ArgumentError(RplGenError):
 class ParserError(RplGenError):
     error_scripts = {
         # [dialog]
-        'UnableDial'  :["Unable to parse as dialogue line, due to invalid syntax!",
-                        "无法解析为对话行，由于错误的语法！"],
+        'UnableDial'  :["Unable to parse as dialogue line {}, due to invalid syntax! Check the console for the raw line and a hint.",
+                        "无法解析为对话行（第{}行），由于错误的语法！原文和可能原因已打印到控制台。"],
         'UnableParse' :["Unable to parse line {}, due to invalid syntax!",
                         "无法解析第{}行，由于错误的语法！"],
         'SwitchDial'  :["Unrecognized switch method: '{}' appeared in dialogue line {}.",

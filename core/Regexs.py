@@ -6,7 +6,8 @@ import re
 
 # replay_generator
 # 将对话行拆分为：[角色框]、<效果>、:文本、<文本效果>、{音效}
-RE_dialogue = re.compile('^\[([\ \w\.\;\(\)\,]+)\](<[\w\=\d]+>)?:(.+?)(<[\w\=\d]+>)?({.+})?$')
+# <效果> 允许带作用对象前缀，如 [角色]<am:cross=10>:文本（am=立绘 bb=气泡 ab=两者）
+RE_dialogue = re.compile('^\[([\ \w\.\;\(\)\,]+)\](<(?:\w+:)?[\w\=\d]+>)?:(.+?)(<[\w\=\d]+>)?({.+})?$')
 # 将放置媒体行，拆分为：<标志>、<效果>、对象
 RE_placeobj = re.compile('^<(background|animation|bubble)>(<[\w\=]+>)?:(.+)$')
 RE_bubble = re.compile('(\w+)\("([^\\"]*)","([^\\"]*)",?(<(\w+)=?(\d+)?>)?\)')
@@ -15,6 +16,8 @@ RE_setting = re.compile('^<(set|move|table):([\w\ \.]+)>:(.+)$')
 RE_characor = re.compile('([\w\ ]+)(\(\d*\))?(\.\w+)?')
 # 将一个<效果> 拆分为 效果、=持续时间
 RE_modify = re.compile('<(\w+)(=\d+)?>')
+# 将一个<效果> 拆分为 作用对象前缀(含冒号)、效果、=持续时间：<am:cross=10>
+RE_method_target = re.compile('<((?:\w+):)?(\w+)(=\d+)?>')
 # 将多个音效拆分为单个音效
 RE_sound = re.compile('({.+?})')
 # 新增：单独提取普通音频框
