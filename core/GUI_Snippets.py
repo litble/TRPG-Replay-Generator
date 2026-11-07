@@ -135,6 +135,14 @@ class RGLSnippets(CodeSnippet, Localize):
                 "am"        : ["仅立绘","am:",3],
                 "bb"        : ["仅气泡","bb:",3],
             },
+            "ab_met_inline":{
+                "replace"   : ["直接替换","replace=>",8],
+                "cross"     : ["交叉溶解","cross=>",6],
+                "black"     : ["淡入淡出","black=>",6],
+                "pass"      : ["左进右出","black_pass_left_minor=>",22],
+                "leap"      : ["上进上出","black_leap_down_minor=>",22],
+                "shake"     : ["震动*"   ,"shake_in_minor=45>",18],
+            },
             "rich":{
                 "bold"          : ["加粗","b",2],
                 "italic"        : ["斜体","i",2],
@@ -273,6 +281,14 @@ class RGLSnippets(CodeSnippet, Localize):
                 "ab"        : ["both (default)","ab:",3],
                 "am"        : ["animation only","am:",3],
                 "bb"        : ["bubble only","bb:",3],
+            },
+            "ab_met_inline":{
+                "replace"   : ["<replace=_>","replace=>",8],
+                "cross"     : ["<cross=_>","cross=>",6],
+                "black"     : ["<black=_>","black=>",6],
+                "pass"      : ["<pass=_>","black_pass_left_minor=>",22],
+                "leap"      : ["<leap=_>","black_leap_down_minor=>",22],
+                "shake"     : ["<shake=_>","shake_in_minor=45>",18],
             },
             "rich":{
                 "bold"          : ["bold","b",2],
@@ -508,8 +524,11 @@ class RGLSnippets(CodeSnippet, Localize):
         elif re.fullmatch('^\[[\w\ \.\,\(\)]+\]<$',text_upstream) and text_downstream[0]==':':
             # 刚输入 [角色]< ，补全作用对象
             self.init_snippets_options('ab_target')
-        elif (text_upstream in ['<animation>','<bubble>'] or re.fullmatch('^\[[\w\ \.\,\(\)]+\](<\w+:)?',text_upstream)) and text_downstream[0]==':' and text_downstream[1:]!='NA':
+        elif (text_upstream in ['<animation>','<bubble>'] or re.fullmatch('^\[[\w\ \.\,\(\)]+\]',text_upstream)) and text_downstream[0]==':' and text_downstream[1:]!='NA':
             self.init_snippets_options('ab_met')
+        elif re.fullmatch('^\[[\w\ \.\,\(\)]+\]<\w+:',text_upstream) and text_downstream[0]==':' and text_downstream[1:]!='NA':
+            # 已经写了作用对象（[角色]<am:）：只需要补效果名，不能再插一个 "<"
+            self.init_snippets_options('ab_met_inline')
         elif re.fullmatch("(.+)<(\w+)=",text_upstream) and text_downstream[0]=='>':
             method = re.fullmatch("(.+)<(\w+)=",text_upstream).group(2)
             if method in ['w2w','l2l','all']:
@@ -528,12 +547,15 @@ class RGLSnippets(CodeSnippet, Localize):
     def init_snippets_options(self,type_='command',**kw_args):
         self.snippets_type = type_
         # 行命令
-        if self.snippets_type in ['command','set','am_dur','tx_dur','formula','inline','protocol','speed','bg_met','ab_met','ab_target','tx_met']:
+        if self.snippets_type in ['command','set','am_dur','tx_dur','formula','inline','protocol','speed','bg_met','ab_met','ab_met_inline','ab_target','tx_met']:
             self.snippets_content = self.Snippets[self.localize][self.snippets_type]
             self.bulid_menu_from_dict(menu=self,dictionary=self.snippets_content)
             # 立绘切换效果的特殊之处
             if self.snippets_type == 'ab_met':
                 self.add_command(label=self.tr('（自定义）'),command=self.custom_ab_method)
+            elif self.snippets_type == 'ab_met_inline':
+                # 已经写了 <am: ，自定义的效果名不能再包一层尖括号
+                self.add_command(label=self.tr('（自定义）'),command=lambda: self.custom_ab_method(inline=True))
         # 角色联想
         elif self.snippets_type=='charactor':
             list_of_snippets = self.ref_char.get_names()
@@ -725,11 +747,12 @@ class RGLSnippets(CodeSnippet, Localize):
             self.codeview.highlight_all()
         return command
     # 自定义切换效果
-    def custom_ab_method(self):
+    def custom_ab_method(self,inline=False):
         method = abmethod_query(master=self.codeview,screenzoom=self.codeview.winfo_toplevel().sz)
         if method:
-            snippet = f'<{method}=>'
-            cpos = len(method) + 2
+            # inline=True 时调用方已经写了 "<am:"，只需要补 "效果=>"
+            snippet = f'{method}=>' if inline else f'<{method}=>'
+            cpos = len(snippet) - 1
             self.codeview.insert(self.curser_idx,chars=snippet)
             self.codeview.mark_set("insert",f'{self.curser_idx}+{cpos}c')
             self.codeview.highlight_all()
