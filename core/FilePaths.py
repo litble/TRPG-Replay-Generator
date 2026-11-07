@@ -12,11 +12,27 @@ class Filepath:
     RplGenpath:str = os.getcwd().replace('\\','/') + '/'
     # 媒体定义文件路径，转义字符：@
     Mediapath:str = RplGenpath
+    # 规范化目录：分隔符一律为 '/'，且保证以 '/' 结尾
+    # Mediapath 会被直接拼在文件名前面（如 media_dir + 'backup/'），缺少结尾的 '/' 会拼错路径
+    @staticmethod
+    def normalize_dir(path:str) -> str:
+        if not path:
+            return ''
+        return str(path).replace('\\','/').rstrip('/') + '/'
+    # 设置 @ 所指向的媒体目录
+    @classmethod
+    def set_media_path(cls,path:str) -> None:
+        cls.Mediapath = cls.normalize_dir(path)
     # 初始化
     def __init__(self,filepath:str,check_exist=True) -> None:
+        if filepath is None:
+            raise MediaError('FileNFound',filepath)
+        # 统一分隔符：外部传入的可能是 windows 的 '\'
+        filepath = str(filepath).replace('\\','/')
         # 相对路径 @
-        if filepath[0] == '@':
-            filepath = self.Mediapath + filepath[1:]
+        if filepath[0:1] == '@':
+            # Mediapath 可能带也可能不带结尾的 '/'，这里保证只拼接一个，避免出现 '//'
+            filepath = self.normalize_dir(self.Mediapath) + filepath[1:].lstrip('/')
         # 相对路径 ./..
         self._absolute = os.path.abspath(filepath).replace('\\','/')
         # 首字符大写
@@ -41,7 +57,9 @@ class Filepath:
                 self._list_absol = [self._absolute]
     # 首字母大写
     def upper(self,_str:str) -> str:
-        if _str[0].islower():
+        if _str == '':
+            return ''
+        elif _str[0].islower():
             return _str[0].upper() + _str[1:]
         else:
             return _str
@@ -53,13 +71,13 @@ class Filepath:
         return self._absolute
     # 相对路径(可能包含通配符)
     def relative(self) -> str:
-        RplGenpath = self.upper(self.RplGenpath)
-        Mediapath = self.upper(self.Mediapath)
+        RplGenpath = self.upper(self.normalize_dir(self.RplGenpath))
+        Mediapath = self.upper(self.normalize_dir(self.Mediapath))
         # 优先使用：项目目录
-        if self._absolute.startswith(Mediapath):
+        if (Mediapath != '') and self._absolute.startswith(Mediapath):
             return '@/' + self._absolute[len(Mediapath):]
         # 程序目录
-        elif self._absolute.startswith(RplGenpath):
+        elif (RplGenpath != '') and self._absolute.startswith(RplGenpath):
             return './' + self._absolute[len(RplGenpath):]
         # 原始目录
         else:

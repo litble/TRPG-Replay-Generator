@@ -39,7 +39,7 @@ class RplGenProJect(Script):
             self.config     = Config()
             self.mediadef   = MediaDef(file_input='./toy/MediaObject.txt')
             # 设置当前路径
-            Filepath.Mediapath = './toy/' #self.media_path
+            Filepath.set_media_path('./toy') #self.media_path
             self.chartab    = CharTable(file_input='./toy/CharactorTable.tsv')
             self.logfile    = {
                 '示例项目1' : RplGenLog(file_input='./toy/LogFile.rgl'),
@@ -51,7 +51,7 @@ class RplGenProJect(Script):
             # config
             self.config     = Config(dict_input=self.struct['config'])
             # media
-            Filepath.Mediapath = Filepath(json_input).directory()
+            Filepath.set_media_path(Filepath(json_input).directory())
             self.mediadef   = MediaDef(dict_input=self.struct['mediadef'])
             # chartab
             self.chartab    = CharTable(dict_input=self.struct['chartab'])

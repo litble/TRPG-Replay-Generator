@@ -305,11 +305,17 @@ class RichText(GlyphSubstitution):
                 pass
             else:
                 raise MediaError("CWKeyInv",key)
+            # 没有指定图标（缺省值 '' ，或 sub_icon 比 sub_key 短）时，用空白图占位
             try:
-                icon_path = Filepath(self.sub_icon[idx])
-                self.icon_dict[key] = self.load_image(icon_path,scale=self.scale)
-            except IndexError:   
+                icon_file = self.sub_icon[idx]
+            except IndexError:
+                icon_file = None
+            if icon_file in [None,'','None']:
                 self.icon_dict[key] = self.blank()
+                continue
+            try:
+                icon_path = Filepath(icon_file)
+                self.icon_dict[key] = self.load_image(icon_path,scale=self.scale)
             except MediaError as E:
                 # 如果是找不到媒体的这种错误
                 raise E

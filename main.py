@@ -11,6 +11,7 @@ import sys
 import os
 # 文件路径
 from core.Medias import MediaObj
+from core.FilePaths import Filepath
 # 配置
 from core.ProjConfig import Config
 from core.ScriptParser import RplGenLog,MediaDef,CharTable,Script
@@ -28,16 +29,34 @@ class ReplayGenerator:
             self.char_path = args.CharacterTable
             self.output_path = args.OutputPath
             self.json_path = args.Json
+            # 输出方式
+            self.export_video = args.ExportVideo
+            self.export_xml = args.ExportXML
             # 配置
             if self.json_path != None:
-                # 如果是json输入
-                input_json = Script(json_input=self.json_input)
+                # 如果是工程文件（.rgpj）输入
+                input_json = Script(json_input=self.json_path)
+                # 工程文件所在目录，同时是 @ 相对路径的基准目录
+                project_dir = Filepath(self.json_path).directory()
+                Filepath.set_media_path(project_dir)
                 self.config = Config(dict_input=input_json.struct['config'])
                 self.config.execute()
                 # 读取输入工程结构
-                self.medef = MediaDef(dict_input=input_json.struct['medef'])
+                self.medef = MediaDef(dict_input=input_json.struct['mediadef'])
                 self.chartab = CharTable(dict_input=input_json.struct['chartab'])
-                self.rplgenlog = RplGenLog(dict_input=input_json.struct['rplgenlog'])
+                # 一份工程可以包含多份剧本：--LogFile 传入剧本名则用它，否则取第一份
+                logfile_struct:dict = input_json.struct['logfile']
+                if (self.log_path is not None) and (self.log_path in logfile_struct):
+                    log_key = self.log_path
+                else:
+                    log_key = next(iter(logfile_struct))
+                print(MainPrint('LoadRGL'), f'[{log_key}]')
+                self.rplgenlog = RplGenLog(dict_input=logfile_struct[log_key])
+                # 没有指定输出目录时，缺省放在工程目录下
+                if self.output_path is None:
+                    self.output_path = project_dir + 'output/'
+                if os.path.isdir(self.output_path) == False:
+                    os.makedirs(self.output_path)
             else:
                 # 通过args输入
                 self.config = Config(argparse_input=args)
@@ -81,12 +100,41 @@ class ReplayGenerator:
     def main(self):
         # welcome
         print(MainPrint('Welcome',EDITION))
+        # 输出目录：缺省路径，并统一为带结尾 '/' 的写法（输出文件名是直接拼在目录后面的）
+        if self.output_path is None:
+            self.output_path = './test_output/'
+        self.output_path = Filepath.normalize_dir(self.output_path)
         # 执行输入
         self.execute_input()
-        # 开始预览播放
-        PreviewDisplay(rplgenlog=self.rplgenlog,config=self.config,output_path=self.output_path)
-        # ExportXML(rplgenlog=self.rplgenlog,config=self.config,output_path=self.output_path)
-        # ExportVideo(rplgenlog=self.rplgenlog,config=self.config,output_path=self.output_path)
+        # 输出方式：导出MP4 / 导出PR项目 / 预览播放
+        if self.export_video:
+            print(MainPrint('ExportMp4'))
+            if os.path.isdir(self.output_path) == False:
+                os.makedirs(self.output_path)
+            flag = ExportVideo(
+                rplgenlog   = self.rplgenlog,
+                config      = self.config,
+                output_path = self.output_path,
+                key         = None
+                ).main()
+        elif self.export_xml:
+            print(MainPrint('ExportXML'))
+            if os.path.isdir(self.output_path) == False:
+                os.makedirs(self.output_path)
+            flag = ExportXML(
+                rplgenlog   = self.rplgenlog,
+                config      = self.config,
+                output_path = self.output_path,
+                key         = None
+                ).main()
+        else:
+            flag = PreviewDisplay(
+                rplgenlog   = self.rplgenlog,
+                config      = self.config
+                ).main()
+        # 退出状态
+        print(MainPrint('Error' if flag != 0 else ('Video' if self.export_video else 'End')))
+        return flag
 
 if __name__ == '__main__':
     import argparse

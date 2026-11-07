@@ -154,18 +154,29 @@ class Script:
 class MediaDef(Script):
     def __init__(self, string_input=None, dict_input=None, file_input=None, json_input=None) -> None:
         super().__init__(string_input, dict_input, file_input, json_input)
-        # 媒体的相对位置@
+        # 媒体的相对位置@ 指向本媒体定义文件所在目录
         if file_input is not None:
             self.media_path = os.path.dirname(file_input.replace('\\','/'))
         elif json_input is not None:
             self.media_path = os.path.dirname(json_input.replace('\\','/'))
+        elif dict_input is not None:
+            # 来自工程文件（.rgpj）的字典：字典本身不携带位置，
+            # 沿用当前的工程上下文（打开工程时 Filepath.Mediapath 已指向工程目录）
+            self.media_path = Filepath.Mediapath
         else:
             self.media_path = Filepath.RplGenpath
+        # 统一为带结尾 '/' 的目录，避免 @ 拼接时出现 '//'
+        self.media_path = Filepath.normalize_dir(self.media_path)
         # 媒体容器是否开放
         self.activated = False
         # 执行媒体类的类变量变更
         # Filepath.Mediapath = self.media_path # 因为MediaDef()用的太多了，不能在初始化的时候这样用了！
         # raise Exception()
+    # 深复制：必须保留媒体目录，否则 @ 相对路径会退回到程序目录
+    def copy(self):
+        new_mediadef = self.__class__(dict_input=self.struct)
+        new_mediadef.media_path = self.media_path
+        return new_mediadef
     # MDF -> struct
     def list_parser(self,list_str:str)->list:
         # 列表，元组，不包含外括号
@@ -437,6 +448,8 @@ class MediaDef(Script):
         # 媒体对象的容器
         self.Medias = {}
         self.activated = True
+        # 媒体相对路径 @ 指向本媒体定义文件所在目录（GUI 之外的分支也需要设置）
+        Filepath.set_media_path(self.media_path)
         # 每一个媒体类
         for i,obj_name in enumerate(self.struct.keys()):
             # 检查是否已经被预先定义
