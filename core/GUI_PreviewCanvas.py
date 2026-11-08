@@ -690,12 +690,12 @@ class RGLPreviewCanvas(PreviewCanvas):
                 index_this = index_this -1
         else:
             return Background('black')
-    def get_placed(self, line_index:str, target='animation'):
+    def get_placed(self, line_index:str, target='animation', slot:int=1):
         index_this = int(line_index)
         while index_this >= 0:
             section_this = self.rplgenlog.struct[str(index_this)]
             # 获取
-            if section_this['type'] == target:
+            if (section_this['type'] == target) and ((target != 'animation') or (section_this.get('slot',1) == slot)):
                 if target == 'animation':
                     am_obj = section_this['object']
                     if am_obj is None:
@@ -833,8 +833,8 @@ class RGLPreviewCanvas(PreviewCanvas):
                     elif layer in ['Am1','Am2','Am3']:
                         if am_dict[layer]:
                             am_dict[layer].preview(self.canvas)
-                    elif layer == 'AmS':
-                        self.get_placed(line_index,target='animation')
+                    elif layer.startswith('AmS'):
+                        self.get_placed(line_index,target='animation',slot=int(layer[3:]))
                     elif layer == 'BbS':
                         self.get_placed(line_index,target='bubble')
                     elif layer == 'Bb':

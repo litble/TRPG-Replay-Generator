@@ -9,7 +9,9 @@ import re
 # <效果> 允许带作用对象前缀，如 [角色]<am:cross=10>:文本（am=立绘 bb=气泡 ab=两者）
 RE_dialogue = re.compile('^\[([\ \w\.\;\(\)\,]+)\](<(?:\w+:)?[\w\=\d]+>)?:(.+?)(<[\w\=\d]+>)?({.+})?$')
 # 将放置媒体行，拆分为：<标志>、<效果>、对象
-RE_placeobj = re.compile('^<(background|animation|bubble)>(<[\w\=]+>)?:(.+)$')
+RE_placeobj = re.compile('^<(background|animation|bubble)(?::\d+)?>(<[\w\=]+>)?:(.+)$')
+# 常驻立绘的槽位号：<animation:3>
+RE_anime_slot = re.compile('^<animation:(\d+)>')
 RE_bubble = re.compile('(\w+)\("([^\\"]*)","([^\\"]*)",?(<(\w+)=?(\d+)?>)?\)')
 RE_setting = re.compile('^<(set|move|table):([\w\ \.]+)>:(.+)$')
 # 将多个角色拆分为单个角色

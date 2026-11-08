@@ -110,6 +110,8 @@ class ParserError(RplGenError):
                         "对象“{}”并非一个立绘类，但其被用于第{}行（立绘行）中！"],
         'ParErrAnime' :["Parse exception occurred in animation line {}.",
                         "解析异常发生在第{}行（立绘行）。"],
+        'AnimeSlot'   :["Animation slot {} is out of range (valid: 1-{})!",
+                        "常驻立绘槽位号 {} 超出范围（合法范围：1-{}）！"],
         # <bubble>
         'InvaPBbExp'  :["The Bubble expression '{0}' specified in bubble line {1} is invalid syntax!",
                         "在第{1}行（气泡行）使用的气泡表达式“{0}”存在语法错误！"],

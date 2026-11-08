@@ -3029,7 +3029,7 @@ ExecuteTableStruct = {
                 "valuekey": "pos",
                 "vitem": "entry",
                 "vtype": "str",
-                "default": "BG2,BG1,Am3,Am2,Am1,AmS,Bb,BbS"
+                "default": "BG2,BG1,Am3,Am2,Am1,AmS1,AmS2,AmS3,AmS4,AmS5,AmS6,Bb,BbS"
             },
         }
     }
@@ -3141,7 +3141,7 @@ ProjectTableStruct = {
                     "valuekey": None,
                     "vitem": "entry",
                     "vtype": "str",
-                    "default": "BG2,BG1,Am3,Am2,Am1,AmS,Bb,BbS"
+                    "default": "BG2,BG1,Am3,Am2,Am1,AmS1,AmS2,AmS3,AmS4,AmS5,AmS6,Bb,BbS"
                 },
             }
         }

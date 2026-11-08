@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # coding: utf-8
 
 # 新建空白项目，新建智能项目的窗口
@@ -16,7 +16,13 @@ from PIL import Image, ImageTk
 from .Exceptions import ParserError
 from .StoryImporter import StoryImporter
 from .ScriptParser import CharTable, RplGenLog, MediaDef
+from .ProjConfig import ANIMATION_LAYERS
 from .GUI_Util import KeyValueDescribe, clear_speech
+
+# 常驻立绘槽位（AmS1..AmS6）整体放进图层顺序
+_AM_SLOT_LAYERS = ','.join(ANIMATION_LAYERS)
+_ZORDER_ANIM_FIRST = 'BG2,BG1,Am3,Am2,Am1,' + _AM_SLOT_LAYERS + ',Bb,BbS'
+_ZORDER_BB_FIRST = 'BG2,BG1,Bb,BbS,Am3,Am2,Am1,' + _AM_SLOT_LAYERS
 from .GUI_TableStruct import ProjectTableStruct
 from .GUI_Language import tr
 from .ProjConfig import preference
@@ -110,13 +116,13 @@ class CreateEmptyProject(CreateProject):
     zorder_preset = {
         'zh':{
             '自定义'    :None,
-            '背景->立绘->气泡'  : "BG2,BG1,Am3,Am2,Am1,AmS,Bb,BbS",
-            '背景->气泡->立绘'  : "BG2,BG1,Bb,BbS,Am3,Am2,Am1,AmS"
+            '背景->立绘->气泡'  : _ZORDER_ANIM_FIRST,
+            '背景->气泡->立绘'  : _ZORDER_BB_FIRST
         },
         'en':{
             'Custom'    :None,
-            'Background->Animation->Bubble'  : "BG2,BG1,Am3,Am2,Am1,AmS,Bb,BbS",
-            'Background->Bubble->Animation'  : "BG2,BG1,Bb,BbS,Am3,Am2,Am1,AmS"
+            'Background->Animation->Bubble'  : _ZORDER_ANIM_FIRST,
+            'Background->Bubble->Animation'  : _ZORDER_BB_FIRST
         }
     }[preference.lang]
     def build_struct(self):
@@ -171,7 +177,7 @@ class CreateEmptyProject(CreateProject):
         if W<=0 or H<=0 or F<=0 or W%2==1 or H%2==1:
             Messagebox().show_error(title=tr('错误'),message=tr('分辨率或帧率是非法的数值！'),parent=self)
             return False
-        all_layer = ['BG1','BG2','Am1','Am2','Am3','AmS','Bb','BbS']
+        all_layer = ['BG1','BG2','Am1','Am2','Am3'] + ANIMATION_LAYERS + ['Bb','BbS']
         for layer in Z:
             if layer in all_layer:
                 all_layer.remove(layer)
@@ -627,7 +633,7 @@ class ConfigureProject(CreateEmptyProject):
         if W<=0 or H<=0 or F<=0 or W%2==1 or H%2==1:
             Messagebox().show_warning(title=tr('警告'),message=tr('分辨率或帧率是非法的数值！'),parent=self)
             return False
-        all_layer = ['BG1','BG2','Am1','Am2','Am3','AmS','Bb','BbS']
+        all_layer = ['BG1','BG2','Am1','Am2','Am3'] + ANIMATION_LAYERS + ['Bb','BbS']
         for layer in Z:
             if layer in all_layer:
                 all_layer.remove(layer)

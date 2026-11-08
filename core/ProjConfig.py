@@ -13,11 +13,22 @@ from .Medias import MediaObj, BuiltInAnimation, HitPoint, Dice
 from .TTSengines import TTS_engine,Aliyun_TTS_engine,Azure_TTS_engine,Tencent_TTS_engine
 from .Security import KeyRequest
 
+# 常驻立绘槽位：AmS1 .. AmS6
+# 用 <animation:N>:对象 可以分别设置每个槽位的内容，槽位之间互不影响
+ANIMATION_SLOT_NUM = 6
+ANIMATION_LAYERS = ['AmS%d' % k for k in range(1, ANIMATION_SLOT_NUM + 1)]
+# 每个图像图层的六列
+ANIMATION_COLUMNS = ['%s%s' % (layer, sub) for layer in ANIMATION_LAYERS for sub in ('', '_t', '_a', '_c', '_p', '_b')]
+# 默认图层顺序：常驻立绘槽位排在气泡之前
+DEFAULT_ZORDER = ['BG2', 'BG1', 'Am3', 'Am2', 'Am1'] + ANIMATION_LAYERS + ['Bb', 'BbS']
+
 # 项目设置
 class Config:
     def __init__(self,dict_input=None,argparse_input=None) -> None:
         # 载入值
         self.set_struct(dict_input=dict_input,argparse_input=argparse_input)
+        # 图层顺序：迁移旧工程的 "AmS"，并补齐缺失的常驻立绘槽位
+        self.normalize_zorder()
         # 检查：帧率
         if self.frame_rate <= 0:
             raise ArgumentError('FrameRate',str(self.frame_rate))
@@ -64,7 +75,32 @@ class Config:
             # 帧率
             self.frame_rate = 30 # 帧率 单位fps
             # 图层顺序
-            self.zorder = ['BG2','BG1','Am3','Am2','Am1','AmS','Bb','BbS'] # 渲染图层顺序
+            self.zorder = list(DEFAULT_ZORDER) # 渲染图层顺序
+    def normalize_zorder(self) -> None:
+        """把旧工程里的 'AmS' 迁移成 'AmS1'，并补齐缺失的常驻立绘槽位。
+
+        旧工程的 zorder 里只有单个 'AmS'，不迁移的话渲染时会找不到对应列。
+        """
+        normalized = []
+        slots_done = False
+        for layer in self.zorder:
+            if layer == 'AmS':
+                # 旧名字，等价于 1 号槽
+                layer = ANIMATION_LAYERS[0]
+            if layer == ANIMATION_LAYERS[0]:
+                if not slots_done:
+                    normalized.extend(ANIMATION_LAYERS)
+                    slots_done = True
+                continue
+            if layer in ANIMATION_LAYERS:
+                # 其余槽位统一在上面一起补齐，避免顺序错乱
+                continue
+            normalized.append(layer)
+        if not slots_done:
+            # zorder 里一个常驻立绘槽都没有：插到气泡之前
+            pos = normalized.index('Bb') if 'Bb' in normalized else len(normalized)
+            normalized[pos:pos] = ANIMATION_LAYERS
+        self.zorder = normalized
     def get_struct(self)->dict:
         return {
             'Name'          : self.Name,

@@ -15,7 +15,7 @@ from .Medias import Text,StrokeText,RichText,HPLabel,Bubble,Balloon,DynamicBubbl
 from .Sprite import Sprite
 from .FreePos import Pos,FreePos,PosGrid,BezierCurve
 from .FilePaths import Filepath
-from .ProjConfig import Config
+from .ProjConfig import Config, ANIMATION_COLUMNS, ANIMATION_LAYERS, ANIMATION_SLOT_NUM
 from .Motion import MotionMethod
 from .Utils import concat_xy
 
@@ -980,8 +980,8 @@ class RplGenLog(Script):
                     this_section['bg_method'] = self.method_parser(obje)
                     # 对象
                     this_section['object'] = objc
-                # 常驻立绘设置行，格式：<animation><black=30>:(Am_obj,Am_obj2)
-                elif text[0:11] == '<animation>':
+                # 常驻立绘设置行，格式：<animation><black=30>:(Am_obj,Am_obj2) / <animation:2><black=30>:Am_obj
+                elif text.startswith('<animation>') | text.startswith('<animation:'):
                     # 解析
                     try:
                         obj_type,obje,objc = RE_placeobj.findall(text)[0]
@@ -989,6 +989,15 @@ class RplGenLog(Script):
                         this_section['type'] = obj_type
                     except IndexError:
                         raise ParserError('UnableParse',str(i+1))
+                    # 槽位号：省略时默认 1 号槽（兼容旧剧本）
+                    slot_match = RE_anime_slot.findall(text)
+                    if slot_match == []:
+                        this_section['slot'] = 1
+                    else:
+                        this_slot:int = int(slot_match[0])
+                        if (this_slot < 1) | (this_slot > ANIMATION_SLOT_NUM):
+                            raise ParserError('AnimeSlot',str(this_slot),str(ANIMATION_SLOT_NUM))
+                        this_section['slot'] = this_slot
                     # <效果>
                     this_section['am_method'] = self.method_parser(obje)
                     # 对象
@@ -1477,7 +1486,9 @@ class RplGenLog(Script):
                 line_num=line_num_est_this,
                 this_duration=this_duration,
                 i=last_section)
-    def place_anime_execute(self,this_placed_anime:tuple,last_section:int,this_section:int)->None:
+    def place_anime_execute(self,this_placed_anime:tuple,last_section:int,this_section:int,slot:int=1)->None:
+        # 槽位对应的图层名（AmS1..AmS6）
+        layer:str = ANIMATION_LAYERS[slot - 1]
         if self.break_point[last_section] == self.break_point[this_section]:
             # 如果持续时间是0，直接略过
             return
@@ -1491,21 +1502,21 @@ class RplGenLog(Script):
             am_dur = 0
             am_method = 'replace'
         # 立绘的对象
-        self.main_timeline.loc[last_placed_index,'AmS'] = this_am
+        self.main_timeline.loc[last_placed_index,layer] = this_am
         # this_am 可能为空的，需要先处理这种情况！
         if this_am == 'NA':
-            self.main_timeline.loc[last_placed_index,'AmS_t'] = 0
-            self.main_timeline.loc[last_placed_index,'AmS_a'] = 0
-            self.main_timeline.loc[last_placed_index,'AmS_b'] = 100
-            self.main_timeline.loc[last_placed_index,'AmS_c'] = 'NA'
-            self.main_timeline.loc[last_placed_index,'AmS_p'] = 'NA'
+            self.main_timeline.loc[last_placed_index,layer+'_t'] = 0
+            self.main_timeline.loc[last_placed_index,layer+'_a'] = 0
+            self.main_timeline.loc[last_placed_index,layer+'_b'] = 100
+            self.main_timeline.loc[last_placed_index,layer+'_c'] = 'NA'
+            self.main_timeline.loc[last_placed_index,layer+'_p'] = 'NA'
         else:
             am_method_obj = MotionMethod(am_method,am_dur,self.dynamic['formula'],this_section)
-            self.main_timeline.loc[last_placed_index,'AmS_a'] = am_method_obj.alpha(this_duration,100)
-            self.main_timeline.loc[last_placed_index,'AmS_b'] = 100
-            self.main_timeline.loc[last_placed_index,'AmS_p'] = am_method_obj.motion(this_duration)
-            self.main_timeline.loc[last_placed_index,'AmS_t'] = self.medias[this_am].get_tick(this_duration)
-            self.main_timeline.loc[last_placed_index,'AmS_c'] = am_center.use(this_duration)
+            self.main_timeline.loc[last_placed_index,layer+'_a'] = am_method_obj.alpha(this_duration,100)
+            self.main_timeline.loc[last_placed_index,layer+'_b'] = 100
+            self.main_timeline.loc[last_placed_index,layer+'_p'] = am_method_obj.motion(this_duration)
+            self.main_timeline.loc[last_placed_index,layer+'_t'] = self.medias[this_am].get_tick(this_duration)
+            self.main_timeline.loc[last_placed_index,layer+'_c'] = am_center.use(this_duration)
     def check_text_execute(self,content_text,this_line_limit,this_line_num_est,i):
         # 检查文本是否为空
         if len(content_text) == 0:
@@ -1578,11 +1589,12 @@ class RplGenLog(Script):
         self.medias:dict = media_define.Medias.copy()
         self.charactors:pd.DataFrame = char_table.export().copy()
         # section:小节号, BG: 背景，Am：立绘，Bb：气泡，BGM：背景音乐，Voice：语音，SE：音效
+        # AmS1..AmS6：常驻立绘槽位，各自独立的六列
         self.render_arg = [
         'section',
         'BG1','BG1_a','BG1_c','BG1_p','BG2','BG2_a','BG2_c','BG2_p',
         'Am1','Am1_t','Am1_a','Am1_c','Am1_p','Am1_b','Am2','Am2_t','Am2_a','Am2_c','Am2_p','Am2_b','Am3','Am3_t','Am3_a','Am3_c','Am3_p','Am3_b',
-        'AmS','AmS_t','AmS_a','AmS_c','AmS_p','AmS_b',
+        ] + list(ANIMATION_COLUMNS) + [
         'Bb','Bb_main','Bb_main_e','Bb_header','Bb_a','Bb_c','Bb_p',
         'BbS','BbS_main','BbS_main_e','BbS_header','BbS_a','BbS_c','BbS_p',
         'BGM','Voice','SE'
@@ -1600,9 +1612,9 @@ class RplGenLog(Script):
         BGM_queue = []
         # 初始化的背景、放置立绘、放置气泡
         this_background = "black"
-        # 放置的立绘
-        last_placed_animation_section = 0
-        this_placed_animation = ('NA','replace',0, Pos()) # am,method,method_dur,center
+        # 放置的立绘（常驻立绘有多个槽位，各自独立记状态）
+        last_placed_animation_section = {slot: 0 for slot in range(1, ANIMATION_SLOT_NUM + 1)}
+        this_placed_animation = {slot: ('NA', 'replace', 0, Pos()) for slot in range(1, ANIMATION_SLOT_NUM + 1)} # am,method,method_dur,center
         # 放置的气泡
         last_placed_bubble_section = 0
         this_placed_bubble = ('NA','replace',0,'','','all',0,Pos()) # bb,method,method_dur,HT,MT,tx_method,tx_dur,center
@@ -2121,8 +2133,15 @@ class RplGenLog(Script):
                     raise ParserError('ParErrBkGd',str(i+1))
             # 放置立绘行
             elif this_section['type'] == 'animation':
+                # 本行的槽位号（<animation:N>，省略时默认 1）
+                this_anime_slot:int = this_section.get('slot',1)
                 # 前一次的
-                self.place_anime_execute(this_placed_anime=this_placed_animation,this_section=i,last_section=last_placed_animation_section)
+                self.place_anime_execute(
+                    this_placed_anime = this_placed_animation[this_anime_slot],
+                    this_section      = i,
+                    last_section      = last_placed_animation_section[this_anime_slot],
+                    slot              = this_anime_slot
+                    )
                 # 处理本次的
                 try:
                     # 处理默认值
@@ -2152,8 +2171,8 @@ class RplGenLog(Script):
                         # 执行
                         if len(anime_objs) == 1:
                             # 检查立绘数量，是不是单个立绘
-                            this_placed_animation = (anime_name[0],method,method_dur,anime_poses[0])
-                            last_placed_animation_section = i
+                            this_placed_animation[this_anime_slot] = (anime_name[0],method,method_dur,anime_poses[0])
+                            last_placed_animation_section[this_anime_slot] = i
                         else:
                             # 生成组合立绘
                             Auto_media_name = 'BIA_'+str(i+1)
@@ -2163,20 +2182,20 @@ class RplGenLog(Script):
                                 subanimation_name = anime_name
                                 )
                             # 标记为下一次
-                            this_placed_animation = (Auto_media_name,method,method_dur,Pos(0,0)) # 因为place的应用是落后于设置的，因此需要保留c参数！
-                            last_placed_animation_section = i
+                            this_placed_animation[this_anime_slot] = (Auto_media_name,method,method_dur,Pos(0,0)) # 因为place的应用是落后于设置的，因此需要保留c参数！
+                            last_placed_animation_section[this_anime_slot] = i
                     # 如果是单个立绘
                     elif this_section['object'] in self.medias.keys():
                         am_name = this_section['object']
                         if type(self.medias[am_name]) not in [Animation,Sprite,Dice,HitPoint,GroupedAnimation]:
                             raise ParserError('NotPAnime',am_name,str(i+1))
                         else: # 如果type 不是 Animation 类，也 UndefPAnime
-                            this_placed_animation = (am_name,method,method_dur,self.medias[am_name].pos)
-                            last_placed_animation_section = i
+                            this_placed_animation[this_anime_slot] = (am_name,method,method_dur,self.medias[am_name].pos)
+                            last_placed_animation_section[this_anime_slot] = i
                     # 如果是取消立绘
                     elif this_section['object'] is None:
-                        this_placed_animation = ('NA','replace',0, Pos())
-                        last_placed_animation_section = i
+                        this_placed_animation[this_anime_slot] = ('NA','replace',0, Pos())
+                        last_placed_animation_section[this_anime_slot] = i
                     else:
                         raise ParserError('UndefPAnime',this_section['object'],str(i+1))
                 except Exception as E:
@@ -2588,7 +2607,13 @@ class RplGenLog(Script):
             self.break_point[i+1]=self.break_point[i]
         # 处理place的末端
         try:
-            self.place_anime_execute(this_placed_anime=this_placed_animation,last_section=last_placed_animation_section,this_section=i+1)
+            for this_anime_slot in range(1, ANIMATION_SLOT_NUM + 1):
+                self.place_anime_execute(
+                    this_placed_anime = this_placed_animation[this_anime_slot],
+                    last_section      = last_placed_animation_section[this_anime_slot],
+                    this_section      = i+1,
+                    slot              = this_anime_slot
+                    )
             self.place_bubble_execute(this_placed_bubble=this_placed_bubble,last_section=last_placed_bubble_section,this_section=i+1)
         except Exception as E:
             raise ParserError('ParErrCompl')

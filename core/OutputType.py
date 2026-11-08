@@ -138,7 +138,9 @@ class OutputMediaType:
                     raise RenderError('FailRender',this_frame[layer],'Bubble')
     # 解析timeline中的 Am 和 Bg 图层，返回clip列表
     def parse_timeline_anime(self,layer:str) -> list:
-        break_at_breakpoint = ((layer[0:2]!='BG') & (layer[-1]!='S')) | self.force_split_clip
+        # AmS1..AmS6 与 BbS 是"持久层"，不需要按断点切 clip
+        is_persistent = layer.endswith('S') | layer.startswith('AmS')
+        break_at_breakpoint = ((layer[0:2]!='BG') & (not is_persistent)) | self.force_split_clip
         track = self.timeline[[layer,layer+'_c']]
         clips = []
         item,begin,end = 'NA',0,0
@@ -801,7 +803,7 @@ class PreviewDisplay(OutputMediaType):
                     # 3:"Command: {0}",
                     4:"Zorder: {0}".format('>>>'+'>'.join(self.config.zorder)+'>>>'),
                     5:"Layer: BG1:{0}; BG2:{1};",
-                    6:"Layer: Am1:{0}; Am2:{1}; Am3:{2}; AmS:{3}",
+                    6:"Layer: Am1:{0}; Am2:{1}; Am3:{2}; AmS1:{3}",
                     7:"Layer: Bb:{0}; HD:{1}; TX:{2}",
                     8:"Layer: BbS:{0}; HDS:{1}; TXS:{2}"
                     }
@@ -925,7 +927,7 @@ class PreviewDisplay(OutputMediaType):
                     # self.annot.blit(self.note_text.render(detail_info[3].format(self.rplgenlog.export[this_frame['section']]),fgcolor=MediaObj.cmap['notetext'],size=0.0185*self.config.Height)[0],(10,10+0.1*self.config.Height))
                     self.annot.blit(self.note_text.render(detail_info[4],fgcolor=MediaObj.cmap['notetext'],size=0.0185*self.config.Height)[0],(10,10+0.1333*self.config.Height))
                     self.annot.blit(self.note_text.render(detail_info[5].format(this_frame['BG1'],this_frame['BG2']),fgcolor=MediaObj.cmap['notetext'],size=0.0185*self.config.Height)[0],(10,10+0.1666*self.config.Height))
-                    self.annot.blit(self.note_text.render(detail_info[6].format(this_frame['Am1'],this_frame['Am2'],this_frame['Am3'],this_frame['AmS']),fgcolor=MediaObj.cmap['notetext'],size=0.0185*self.config.Height)[0],(10,10+0.2*self.config.Height))
+                    self.annot.blit(self.note_text.render(detail_info[6].format(this_frame['Am1'],this_frame['Am2'],this_frame['Am3'],this_frame['AmS1']),fgcolor=MediaObj.cmap['notetext'],size=0.0185*self.config.Height)[0],(10,10+0.2*self.config.Height))
                     self.annot.blit(self.note_text.render(detail_info[7].format(this_frame['Bb'],this_frame['Bb_header'],this_frame['Bb_main']),fgcolor=MediaObj.cmap['notetext'],size=0.0185*self.config.Height)[0],(10,10+0.2333*self.config.Height))
                     self.annot.blit(self.note_text.render(detail_info[8].format(this_frame['BbS'],this_frame['BbS_header'],this_frame['BbS_main']),fgcolor=MediaObj.cmap['notetext'],size=0.0185*self.config.Height)[0],(10,10+0.2666*self.config.Height))
                 # 仅显示帧率
