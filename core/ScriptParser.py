@@ -1301,7 +1301,10 @@ class RplGenLog(Script):
             elif type_this == 'animation':
                 MM = self.method_export(this_section['am_method'])
                 OB = self.anime_export(this_section['object'])
-                this_script = '<animation>' + MM + ':' + OB
+                # 槽位号：1 号槽是默认值，省略不写，保持旧格式
+                this_slot:int = this_section.get('slot',1)
+                slot_tag:str = '' if this_slot == 1 else (':' + str(this_slot))
+                this_script = '<animation' + slot_tag + '>' + MM + ':' + OB
             # 气泡
             elif type_this == 'bubble':
                 MM = self.method_export(this_section['bb_method'])
